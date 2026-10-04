@@ -2,27 +2,33 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: gap: content: https://drive.google.com;">
-    <title>Movie Night</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Night Activity</title>
     <style>
         body, html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
-            background: #0f0f0f;
+            background: #000;
             display: flex;
             justify-content: center;
             align-items: center;
+            overflow: hidden;
         }
-        iframe {
+        video {
             width: 100%;
             height: 100%;
-            border: none;
+            max-height: 100vh;
+            outline: none;
         }
     </style>
 </head>
 <body>
-    <iframe src="https://drive.google.com/file/d/1H-7qpOSRf6jMJp5xw2U8vypc1ey-OYI3/preview" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+    <video controls autoplay>
+        <!-- Paste your direct video link below -->
+        <source src="https://lh3.googleusercontent.com/d/1H-7qpOSRf6jMJp5xw2U8vypc1ey-OYI3" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
 </body>
 </html>
