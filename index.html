@@ -16,14 +16,18 @@
             align-items: center;
             overflow: hidden;
         }
-        iframe {
+        video {
             width: 100%;
             height: 100%;
-            border: none;
+            max-height: 100vh;
+            outline: none;
         }
     </style>
 </head>
 <body>
-    <iframe src="https://drive.google.com/uc?export=view&id=1H-7qpOSRf6jMJp5xw2U8vypc1ey-OYI3" allow="autoplay" allowfullscreen></iframe>
+    <video controls autoplay>
+        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
 </body>
 </html>
