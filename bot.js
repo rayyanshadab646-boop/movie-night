@@ -112,17 +112,12 @@ client.on('interactionCreate', async interaction => {
             await interaction.showModal(modal);
         }
 
-        // /movie info command
+        // /movie info command (Reverted to your original layout)
         if (commandName === 'movie' && options.getSubcommand() === 'info') {
             const embed = new EmbedBuilder()
                 .setColor(0x0099ff)
-                .setTitle('🎬 Current Movie Night Info')
-                .addFields(
-                    { name: 'Title', value: currentMovie.title, inline: false },
-                    { name: 'Stream Link', value: currentMovie.url, inline: false },
-                    { name: 'Start Time', value: currentMovie.time, inline: true },
-                    { name: 'Host', value: currentMovie.host, inline: true }
-                )
+                .setTitle('🎬 Upcoming Movie Night')
+                .setDescription(`**Movie:** ${currentMovie.title}\n**Start Time:** ${currentMovie.time}\n**Stream Link:** ${currentMovie.url}\n**Host:** ${currentMovie.host}`)
                 .setTimestamp();
 
             await interaction.reply({ embeds: [embed] });
