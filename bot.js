@@ -1,25 +1,26 @@
-// 1. Mandatory HTTP server for Render health checks and UptimeRobot pings
 const http = require('http');
-const server = http.createServer((req, res) => {
+http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Movie Night Bot is alive and running 24/7!');
-});
-server.listen(process.env.PORT || 3000);
+    res.end('Bot is alive!');
+}).listen(process.env.PORT || 3000);
 
-// 2. Discord bot setup
 const { Client, GatewayIntentBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, REST, Routes, SlashCommandBuilder } = require('discord.js');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
+const TOKEN = process.env.TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID;
+const AUTHORIZED_USER_ID = process.env.AUTHORIZED_USER_ID;
+
 // Store the latest movie configuration globally so anyone can fetch it via /movie info
 let activeMovie = null;
 
-client.once('ready', async () => {
+client.once('clientReady', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
 
-    const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+    const rest = new REST({ version: '10' }).setToken(TOKEN);
     try {
-        await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
+        await rest.put(Routes.applicationCommands(CLIENT_ID), {
             body: [
                 new SlashCommandBuilder()
                     .setName('movienight')
@@ -50,7 +51,7 @@ client.on('interactionCreate', async interaction => {
         
         // Handle /movienight (Host Only)
         if (interaction.commandName === 'movienight') {
-            if (interaction.user.id !== process.env.AUTHORIZED_USER_ID) {
+            if (interaction.user.id !== AUTHORIZED_USER_ID) {
                 return interaction.reply({
                     content: `❌ <@${interaction.user.id}>, only the designated host is allowed to configure Movie Night! Use \`/movie info\` to view the active movie.`,
                     ephemeral: true
@@ -170,4 +171,4 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-client.login(process.env.TOKEN);
+client.login(TOKEN);
