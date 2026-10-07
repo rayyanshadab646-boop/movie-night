@@ -2,6 +2,8 @@ const { Client, GatewayIntentBits, ModalBuilder, TextInputBuilder, TextInputStyl
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
+const port = process.env.PORT || 4000 
+
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const AUTHORIZED_USER_ID = process.env.AUTHORIZED_USER_ID;
