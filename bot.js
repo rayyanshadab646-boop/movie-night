@@ -1,174 +1,140 @@
+// 1. Mandatory HTTP server for Render health checks and UptimeRobot pings
 const http = require('http');
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Bot is alive!');
-}).listen(process.env.PORT || 3000);
+    res.end('Movie Night Bot is alive and running 24/7!');
+});
+server.listen(process.env.PORT || 3000);
 
-const { Client, GatewayIntentBits, ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle, REST, Routes, SlashCommandBuilder } = require('discord.js');
+// 2. Discord.js client setup
+const { 
+    Client, 
+    GatewayIntentBits, 
+    ModalBuilder, 
+    TextInputBuilder, 
+    TextInputStyle, 
+    ActionRowBuilder, 
+    EmbedBuilder, 
+    REST, 
+    Routes, 
+    SlashCommandBuilder 
+} = require('discord.js');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-const TOKEN = process.env.TOKEN;
-const CLIENT_ID = process.env.CLIENT_ID;
-const AUTHORIZED_USER_ID = process.env.AUTHORIZED_USER_ID;
+// Store current movie session data in memory
+let currentMovie = {
+    title: "No movie set yet",
+    url: "N/A",
+    time: "N/A",
+    host: "None"
+};
 
-// Store the latest movie configuration globally so anyone can fetch it via /movie info
-let activeMovie = null;
+// Define slash commands
+const commands = [
+    new SlashCommandBuilder()
+        .setName('movienight')
+        .setDescription('Configure a movie night session (Host Only)')
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('set')
+                .setDescription('Set up a new movie session')
+        ),
+    new SlashCommandBuilder()
+        .setName('movie')
+        .setDescription('Movie night information commands')
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('info')
+                .setDescription('View the current movie night details')
+        )
+].map(command => command.toJSON());
 
-client.once('clientReady', async () => {
+// Register slash commands when bot comes online
+client.once('ready', async () => {
     console.log(`Logged in as ${client.user.tag}!`);
 
-    const rest = new REST({ version: '10' }).setToken(TOKEN);
+    const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+
     try {
-        await rest.put(Routes.applicationCommands(CLIENT_ID), {
-            body: [
-                new SlashCommandBuilder()
-                    .setName('movienight')
-                    .setDescription('Configure a movie night session (Host Only)')
-                    .toJSON(),
-                new SlashCommandBuilder()
-                    .setName('movie')
-                    .setDescription('Movie night options')
-                    .addSubcommand(subcommand =>
-                        subcommand
-                            .setName('info')
-                            .setDescription('Get the current movie night details and stream link')
-                    )
-                    .toJSON()
-            ],
-        });
-        console.log('Successfully registered slash commands.');
+        console.log('Started refreshing application (/) commands.');
+        await rest.put(
+            Routes.applicationCommands(process.env.CLIENT_ID),
+            { body: commands },
+        );
+        console.log('Successfully reloaded application (/) commands.');
     } catch (error) {
         console.error(error);
     }
 });
 
+// Handle interactions (Slash commands and Modals)
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand() && !interaction.isModalSubmit()) return;
-
-    // 1. Handle Slash Commands
     if (interaction.isChatInputCommand()) {
-        
-        // Handle /movienight (Host Only)
-        if (interaction.commandName === 'movienight') {
-            if (interaction.user.id !== AUTHORIZED_USER_ID) {
-                return interaction.reply({
-                    content: `❌ <@${interaction.user.id}>, only the designated host is allowed to configure Movie Night! Use \`/movie info\` to view the active movie.`,
-                    ephemeral: true
-                });
+        const { commandName, options } = interaction;
+
+        // /movienight set command
+        if (commandName === 'movienight' && options.getSubcommand() === 'set') {
+            // Check if user is authorized host
+            if (interaction.user.id !== process.env.AUTHORIZED_USER_ID) {
+                return interaction.reply({ content: '❌ Only the designated host can configure movie nights.', ephemeral: true });
             }
 
+            // Create Modal for movie configuration
             const modal = new ModalBuilder()
                 .setCustomId('movieModal')
                 .setTitle('Configure Movie Night');
 
-            const nameInput = new TextInputBuilder()
-                .setCustomId('movieNameInput')
-                .setLabel('Movie Name')
+            const titleInput = new TextInputBuilder()
+                .setCustomId('movieTitle')
+                .setLabel('Movie Title')
                 .setStyle(TextInputStyle.Short)
-                .setPlaceholder('e.g., Interstellar')
-                .setRequired(true);
-
-            const instructionsInput = new TextInputBuilder()
-                .setCustomId('instructionsInput')
-                .setLabel('Custom Instructions')
-                .setStyle(TextInputStyle.Paragraph)
-                .setPlaceholder('Enter instructions here...')
                 .setRequired(true);
 
             const urlInput = new TextInputBuilder()
-                .setCustomId('movieUrlInput')
-                .setLabel('Direct Movie / Stream Link')
+                .setCustomId('movieUrl')
+                .setLabel('Stream URL')
                 .setStyle(TextInputStyle.Short)
-                .setPlaceholder('Paste your link here')
+                .setRequired(true);
+
+            const timeInput = new TextInputBuilder()
+                .setCustomId('movieTime')
+                .setLabel('Start Time')
+                .setStyle(TextInputStyle.Short)
                 .setRequired(true);
 
             modal.addComponents(
-                new ActionRowBuilder().addComponents(nameInput),
-                new ActionRowBuilder().addComponents(instructionsInput),
-                new ActionRowBuilder().addComponents(urlInput)
+                new ActionRowBuilder().addComponents(titleInput),
+                new ActionRowBuilder().addComponents(urlInput),
+                new ActionRowBuilder().addComponents(timeInput)
             );
 
             await interaction.showModal(modal);
         }
 
-        // Handle /movie info (Available to everyone)
-        if (interaction.commandName === 'movie') {
-            const subcommand = interaction.options.getSubcommand();
-
-            if (subcommand === 'info') {
-                if (!activeMovie) {
-                    return interaction.reply({
-                        content: '🍿 There is no active movie night set up yet! Ask the host to configure one first.',
-                        ephemeral: true
-                    });
-                }
-
-                try {
-                    const row = new ActionRowBuilder().addComponents(
-                        new ButtonBuilder()
-                            .setLabel('Open Stream Link')
-                            .setURL(activeMovie.url)
-                            .setStyle(ButtonStyle.Link)
-                    );
-
-                    const embed = new EmbedBuilder()
-                        .setColor(0x5865F2)
-                        .setTitle(`🍿 Movie Night: ${activeMovie.name}`)
-                        .setDescription('Here is the current movie night info you requested!')
-                        .addFields(
-                            { name: '📖 Instructions', value: activeMovie.instructions }
-                        )
-                        .setFooter({ text: 'Server Movie Night Hub' });
-
-                    await interaction.reply({ embeds: [embed], components: [row] });
-                } catch (error) {
-                    console.error('Error handling /movie info command:', error);
-                }
-            }
-        }
-    }
-
-    // 2. Handle Modal Submission from Host
-    if (interaction.isModalSubmit() && interaction.customId === 'movieModal') {
-        const movieName = interaction.fields.getTextInputValue('movieNameInput');
-        const customInstructions = interaction.fields.getTextInputValue('instructionsInput');
-        const movieUrl = interaction.fields.getTextInputValue('movieUrlInput');
-
-        try {
-            // Save movie details globally so /movie info can pull it up anytime
-            activeMovie = {
-                name: movieName,
-                instructions: customInstructions,
-                url: movieUrl
-            };
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setLabel('Open Stream Link')
-                    .setURL(movieUrl)
-                    .setStyle(ButtonStyle.Link)
-            );
-
+        // /movie info command (Reverted to your original layout)
+        if (commandName === 'movie' && options.getSubcommand() === 'info') {
             const embed = new EmbedBuilder()
-                .setColor(0x5865F2)
-                .setTitle(`🍿 Movie Night: ${movieName}`)
-                .setDescription('Grab your snacks and get comfortable! Click the button below to join the stream.')
-                .addFields(
-                    { name: '📖 Instructions', value: customInstructions }
-                )
-                .setFooter({ text: 'Server Movie Night Hub' });
+                .setColor(0x0099ff)
+                .setTitle('🎬 Upcoming Movie Night')
+                .setDescription(`**Movie:** ${currentMovie.title}\n**Start Time:** ${currentMovie.time}\n**Stream Link:** ${currentMovie.url}\n**Host:** ${currentMovie.host}`)
+                .setTimestamp();
 
-            // Post initial announcement to the channel
-            await interaction.reply({ embeds: [embed], components: [row] });
+            await interaction.reply({ embeds: [embed] });
+        }
+    } 
+    // Handle Modal Submission
+    else if (interaction.isModalSubmit()) {
+        if (interaction.customId === 'movieModal') {
+            currentMovie.title = interaction.fields.getTextInputValue('movieTitle');
+            currentMovie.url = interaction.fields.getTextInputValue('movieUrl');
+            currentMovie.time = interaction.fields.getTextInputValue('movieTime');
+            currentMovie.host = interaction.user.tag;
 
-        } catch (error) {
-            await interaction.reply({ 
-                content: '⚠️ **Invalid Link Provided!** Please make sure your stream link starts with `https://`.', 
-                ephemeral: true 
-            });
+            await interaction.reply({ content: `✅ Movie night successfully updated to: **${currentMovie.title}**!`, ephemeral: true });
         }
     }
 });
 
-client.login(TOKEN);
+// Log in using environment token
+client.login(process.env.TOKEN);
